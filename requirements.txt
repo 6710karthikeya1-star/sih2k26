@@ -1,0 +1,8 @@
+requests[socks]>=2.31.0
+stem>=1.8.2
+psycopg2-binary>=2.9.9
+beautifulsoup4>=4.12.3
+fastapi>=0.110.0
+uvicorn>=0.28.0
+networkx>=3.2.1
+pyvis>=0.3.2

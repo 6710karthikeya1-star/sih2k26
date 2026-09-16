@@ -1,0 +1,61 @@
+{
+    "actor_profile": {
+        "actor_id": "3e6c475a-bcb4-4504-9b51-455eed051a83",
+        "primary_label": "DreadOps",
+        "risk_score": 100,
+        "first_observed": "2026-09-02 15:33:07",
+        "last_observed": "2026-09-02 15:33:07",
+        "notes": null
+    },
+    "aliases": [
+        {
+            "alias_name": "DreadOps",
+            "source_platform": "Dread",
+            "first_seen": "2026-09-02 15:33:07"
+        },
+        {
+            "alias_name": "ApexBreach",
+            "source_platform": "Exploit",
+            "first_seen": "2026-09-02 15:33:07"
+        }
+    ],
+    "crypto_wallets": [
+        {
+            "currency": "XMR",
+            "address": "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkFxbANsAnJYPbb3iQ1YBRk1UXCDRSiKc9bkMyNVZnnC5Bjpps557xKqAb7",
+            "first_seen": "2026-09-02 15:33:07"
+        },
+        {
+            "currency": "BTC",
+            "address": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            "first_seen": "2026-09-02 15:33:07"
+        }
+    ],
+    "contact_handles": [
+        {
+            "handle_type": "email",
+            "handle_value": "phantom_ops@exploit.im"
+        },
+        {
+            "handle_type": "telegram",
+            "handle_value": "exploit"
+        },
+        {
+            "handle_type": "xmpp",
+            "handle_value": "exploit.im"
+        }
+    ],
+    "forensic_evidence": [
+        {
+            "source_url": "http://dreadmarket.onion/thread/1",
+            "sha256_checksum": "f1360ba152bb1abc86b929a6addd787193ec4bec98949d708b952aa3ec345a8f",
+            "crawled_at": "2026-09-02T15:33:07.063013+00:00"
+        },
+        {
+            "source_url": "http://exploitmarket.onion/thread/2",
+            "sha256_checksum": "7909309f55fd2ed52845fde13d504fb6a316c5d68d8f61e093e898781296f386",
+            "crawled_at": "2026-09-02T15:33:07.087203+00:00"
+        }
+    ],
+    "generated_at": "2026-09-06T14:00:47.060823Z"
+}

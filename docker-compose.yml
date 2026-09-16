@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  tor-proxy:
+    image: dperson/torproxy:latest
+    container_name: sih_tor_proxy
+    ports:
+      - "9050:9050"
+      - "9051:9051"
+    restart: unless-stopped
+
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: sih_postgres_db
+    environment:
+      POSTGRES_USER: intel_admin
+      POSTGRES_PASSWORD: ntro_secure_password_2026
+      POSTGRES_DB: darkweb_intelligence
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
