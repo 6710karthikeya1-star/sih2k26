@@ -1,11 +1,32 @@
-﻿from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import os
-from db_manager import get_connection
+import uuid
+import hashlib
+from datetime import datetime
+from db_manager import get_connection, init_database
 from report_generator import InvestigationReportGenerator
+from entity_extractor import ThreatEntityExtractor
+from resolution_pipeline import EntityResolutionPipeline
 
-app = FastAPI(title="NTRO Dark Web Intel System", version="2.1.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_database()
+    if os.path.exists("seed_demo_data.py"):
+        try:
+            import seed_demo_data
+        except Exception:
+            pass
+    elif os.path.exists("main.py"):
+        try:
+            import main
+        except Exception:
+            pass
+    yield
+
+app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,42 +76,146 @@ def download_pdf_report(actor_id: str):
     except ValueError:
         raise HTTPException(status_code=404, detail="Actor not found")
 
+@app.get("/api/v1/graph/data")
+def get_graph_data():
+    conn = get_connection()
+    cur = conn.cursor()
+    nodes = []
+    edges = []
+
+    cur.execute("SELECT actor_id, primary_label, risk_score FROM threat_actors;")
+    for row in cur.fetchall():
+        nodes.append({
+            "id": f"actor_{row['actor_id']}",
+            "label": f"TARGET: {row['primary_label']}",
+            "color": "#ef4444",
+            "shape": "diamond",
+            "size": 26
+        })
+
+    cur.execute("SELECT actor_id, alias_name, source_platform FROM actor_aliases;")
+    for row in cur.fetchall():
+        a_node = f"alias_{row['alias_name']}"
+        nodes.append({
+            "id": a_node,
+            "label": f"[{row['source_platform']}] {row['alias_name']}",
+            "color": "#38bdf8",
+            "shape": "dot",
+            "size": 18
+        })
+        edges.append({"from": f"actor_{row['actor_id']}", "to": a_node, "label": "USES_ALIAS"})
+
+    cur.execute("SELECT actor_id, currency, address FROM crypto_wallets;")
+    for row in cur.fetchall():
+        w_node = f"wallet_{row['address']}"
+        nodes.append({
+            "id": w_node,
+            "label": f"{row['currency']}: {row['address'][:8]}...",
+            "color": "#f59e0b",
+            "shape": "triangle",
+            "size": 16
+        })
+        edges.append({"from": f"actor_{row['actor_id']}", "to": w_node, "label": "TRANSACTS_VIA"})
+
+    cur.execute("SELECT actor_id, handle_type, handle_value FROM contact_handles;")
+    for row in cur.fetchall():
+        c_node = f"contact_{row['handle_value']}"
+        nodes.append({
+            "id": c_node,
+            "label": f"{row['handle_type'].upper()}: {row['handle_value']}",
+            "color": "#10b981",
+            "shape": "square",
+            "size": 16
+        })
+        edges.append({"from": f"actor_{row['actor_id']}", "to": c_node, "label": "CONTACT_PIVOT"})
+
+    cur.execute("SELECT actor_id, ip_address FROM ip_addresses;")
+    for row in cur.fetchall():
+        ip_node = f"ip_{row['ip_address']}"
+        nodes.append({
+            "id": ip_node,
+            "label": f"LEAKED IP: {row['ip_address']}",
+            "color": "#dc2626",
+            "shape": "star",
+            "size": 24
+        })
+        edges.append({"from": f"actor_{row['actor_id']}", "to": ip_node, "label": "INFRA_LEAK"})
+
+    conn.close()
+    return {"nodes": nodes, "edges": edges}
+
+@app.post("/api/v1/ingest/live")
+def live_ingest(payload: dict = Body(...)):
+    raw_text = payload.get("text", "")
+    alias = payload.get("alias", "Unknown_Alias")
+    platform = payload.get("platform", "Live_Submission")
+    source_url = payload.get("url", f"http://manual-inspect-{uuid.uuid4().hex[:6]}.onion/feed")
+
+    if not raw_text.strip():
+        raise HTTPException(status_code=400, detail="Evidence text cannot be empty")
+
+    extractor = ThreatEntityExtractor()
+    resolver = EntityResolutionPipeline()
+
+    extracted = extractor.extract_entities(raw_text, source_url)
+    actor_id = resolver.resolve_and_store(extracted, alias, platform)
+
+    return {
+        "status": "INGESTION_COMPLETE",
+        "actor_id": actor_id,
+        "sha256_checksum": extracted["evidence_metadata"]["sha256_checksum"],
+        "extracted_entities": extracted
+    }
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def investigation_dashboard():
     return """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NTRO Dark Web Intel Dashboard</title>
+    <title>NTRO Darknet Threat Attribution & Entity Resolution Suite</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background:#0f172a; color:#f8fafc; padding:24px; }
-        header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:16px; margin-bottom:24px; }
-        h1 { font-size:22px; color:#38bdf8; }
-        .badge { background:#dc2626; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:bold; }
+        body { background:#0b1120; color:#f8fafc; padding:20px; }
+        header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:16px; margin-bottom:20px; }
+        h1 { font-size:22px; color:#38bdf8; display:flex; align-items:center; gap:8px; }
+        .badge { background:#0284c7; padding:4px 10px; border-radius:4px; font-size:12px; font-weight:bold; }
+        .tabs { display:flex; gap:10px; margin-bottom:18px; }
+        .tab-btn { background:#1e293b; color:#94a3b8; border:1px solid #334155; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600; font-size:13px; }
+        .tab-btn.active { background:#0284c7; color:#fff; border-color:#38bdf8; }
         .grid { display:grid; grid-template-columns: 1fr 2fr; gap:20px; }
-        .card { background:#1e293b; border-radius:8px; border:1px solid #334155; padding:18px; }
-        .card h2 { font-size:15px; margin-bottom:12px; color:#94a3b8; text-transform:uppercase; }
+        .card { background:#111827; border-radius:8px; border:1px solid #1f2937; padding:18px; }
+        .card h2 { font-size:14px; margin-bottom:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; }
         table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
-        th, td { padding:10px; text-align:left; border-bottom:1px solid #334155; }
+        th, td { padding:10px; text-align:left; border-bottom:1px solid #1f2937; }
         th { color:#94a3b8; font-weight:600; }
         .risk-pill { padding:3px 8px; border-radius:4px; font-weight:bold; font-size:11px; background:#ef4444; color:#fff; }
         .ip-badge { background:#b91c1c; color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:11px; }
         .btn { background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; display:inline-block; }
         .btn:hover { background:#0369a1; }
-        pre { background:#0f172a; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #334155; }
+        pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; }
+        #network-graph { width: 100%; height: 580px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
+        textarea, input { width:100%; background:#030712; border:1px solid #334155; color:#fff; padding:10px; border-radius:6px; font-size:13px; margin-bottom:10px; }
     </style>
 </head>
 <body>
     <header>
         <div>
-            <h1>NTRO Darknet Threat Attribution Platform</h1>
-            <p style="color:#64748b; font-size:13px;">SIH26151: Real-Time De-Anonymization & Infrastructure Leaks</p>
+            <h1>🛡️ NTRO Threat Attribution Engine <span style="font-size:12px; color:#64748b;">(SIH26151 National Evaluation Prototype)</span></h1>
+            <p style="color:#64748b; font-size:13px;">Automated Darknet De-Anonymization, Multi-Pivot Entity Resolution & Infrastructure Fingerprinting</p>
         </div>
-        <span class="badge">IP LEAK DETECTION ACTIVE</span>
+        <span class="badge">NIST SP 800-86 FORENSIC READY</span>
     </header>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchView('dossier')">Target Dossier View</button>
+        <button class="tab-btn" onclick="switchView('graph')">Interactive Syndicate Network Graph</button>
+        <button class="tab-btn" onclick="switchView('sandbox')">Live Evidence Ingestion Sandbox</button>
+    </div>
     
-    <div class="grid">
+    <!-- TAB 1: DOSSIER VIEW -->
+    <div id="view-dossier" class="grid">
         <div class="card">
             <h2>Resolved Targets</h2>
             <div id="target-list">Loading actors...</div>
@@ -101,12 +226,57 @@ def investigation_dashboard():
         </div>
     </div>
 
+    <!-- TAB 2: INTERACTIVE GRAPH VIEW -->
+    <div id="view-graph" style="display:none;" class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h2>Bipartite Intelligence Graph (Multi-Hop De-Anonymization Clusters)</h2>
+            <span style="font-size:12px; color:#94a3b8;">🔴 Target Diamond &nbsp;|&nbsp; 🔵 Alias &nbsp;|&nbsp; 🟡 Crypto &nbsp;|&nbsp; 🟢 Contact &nbsp;|&nbsp; ⭐ Leaked Origin IP</span>
+        </div>
+        <div id="network-graph"></div>
+    </div>
+
+    <!-- TAB 3: LIVE SANDBOX VIEW -->
+    <div id="view-sandbox" style="display:none;" class="card">
+        <h2>Live Dark Web Ingestion Terminal (Evaluate in Real-Time)</h2>
+        <p style="color:#94a3b8; font-size:13px; margin-bottom:14px;">Paste any unstructured darknet post below to watch our engine extract cryptographic pivots, compute SHA-256 integrity, and resolve aliases live:</p>
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div>
+                <input id="input-alias" placeholder="Suspect Handle (e.g., PhantomRaven)" />
+                <input id="input-platform" placeholder="Marketplace / Forum (e.g., Dread Forum)" />
+                <textarea id="input-text" rows="8" placeholder="Enter post text with BTC address, Jabber ID, or proxy IP leak..."></textarea>
+                <button class="btn" style="width:100%; padding:10px;" onclick="submitLiveEvidence()">⚡ Execute Live Ingestion & Resolution</button>
+            </div>
+            <div>
+                <h3 style="font-size:13px; color:#94a3b8; margin-bottom:8px;">Live Engine Terminal Output</h3>
+                <pre id="sandbox-output">// Awaiting input...</pre>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentActors = [];
+        let network = null;
+
+        function switchView(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('view-dossier').style.display = (tab === 'dossier') ? 'grid' : 'none';
+            document.getElementById('view-graph').style.display = (tab === 'graph') ? 'block' : 'none';
+            document.getElementById('view-sandbox').style.display = (tab === 'sandbox') ? 'block' : 'none';
+
+            if(tab === 'dossier') event.target.classList.add('active');
+            if(tab === 'graph') {
+                event.target.classList.add('active');
+                renderGraph();
+            }
+            if(tab === 'sandbox') event.target.classList.add('active');
+        }
+
         async function loadActors() {
             const res = await fetch('/api/v1/actors');
-            const actors = await res.json();
+            currentActors = await res.json();
             let html = '<table><thead><tr><th>Primary Label</th><th>Risk</th><th>Aliases</th><th>IP Leaks</th><th>Action</th></tr></thead><tbody>';
-            actors.forEach(a => {
+            currentActors.forEach(a => {
                 html += `<tr>
                     <td><b>${a.primary_label}</b></td>
                     <td><span class="risk-pill">${a.risk_score}/100</span></td>
@@ -117,14 +287,14 @@ def investigation_dashboard():
             });
             html += '</tbody></table>';
             document.getElementById('target-list').innerHTML = html;
-            if(actors.length > 0) viewDetail(actors[0].actor_id);
+            if(currentActors.length > 0) viewDetail(currentActors[0].actor_id);
         }
 
         async function viewDetail(actorId) {
             const res = await fetch(`/api/v1/actors/${actorId}`);
             const data = await res.json();
             let p = data.actor_profile;
-            let ipHtml = data.leaked_ips.length > 0
+            let ipHtml = (data.leaked_ips && data.leaked_ips.length > 0)
                 ? `<div style="background:#450a0a; border:1px solid #ef4444; border-radius:6px; padding:10px; margin:12px 0;">
                      <h4 style="color:#f87171; font-size:13px;">CRITICAL: Clearnet IP Leaks Discovered</h4>
                      <ul>${data.leaked_ips.map(ip => `<li style="margin-left:20px; font-size:12px; color:#fca5a5;"><b>${ip.ip_address}</b> (Source: ${ip.leak_source})</li>`).join('')}</ul>
@@ -135,7 +305,7 @@ def investigation_dashboard():
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                     <div>
                         <h3 style="color:#f8fafc; font-size:18px;">${p.primary_label}</h3>
-                        <span style="font-size:11px; color:#64748b;">UUID: ${p.actor_id}</span>
+                        <span style="font-size:11px; color:#64748b;">Master Target UUID: ${p.actor_id}</span>
                     </div>
                     <a href="/api/v1/reports/${p.actor_id}/pdf" target="_blank" class="btn" style="background:#10b981;">Download Case PDF</a>
                 </div>
@@ -149,11 +319,45 @@ def investigation_dashboard():
                 <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Contact Identifiers:</h4>
                 <ul>${data.contact_handles.map(h => `<li style="margin-left:20px; font-size:12px;"><b>[${h.handle_type.toUpperCase()}]</b> ${h.handle_value}</li>`).join('')}</ul>
 
-                <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Digital Evidence Chain of Custody:</h4>
+                <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Digital Evidence Chain of Custody (SHA-256):</h4>
                 <pre>${JSON.stringify(data.forensic_evidence, null, 2)}</pre>
             `;
             document.getElementById('target-detail').innerHTML = html;
         }
+
+        async function renderGraph() {
+            const res = await fetch('/api/v1/graph/data');
+            const data = await res.json();
+            const container = document.getElementById('network-graph');
+            const graphData = {
+                nodes: new vis.DataSet(data.nodes),
+                edges: new vis.DataSet(data.edges)
+            };
+            const options = {
+                physics: { stabilization: true, barnesHut: { springLength: 100 } },
+                nodes: { font: { color: "#ffffff", size: 12 } },
+                edges: { color: "#475569", font: { color: "#94a3b8", size: 10 } }
+            };
+            network = new vis.Network(container, graphData, options);
+        }
+
+        async function submitLiveEvidence() {
+            const text = document.getElementById('input-text').value;
+            const alias = document.getElementById('input-alias').value;
+            const platform = document.getElementById('input-platform').value;
+            const outBox = document.getElementById('sandbox-output');
+
+            outBox.innerText = "[*] Extracting digital pivots & computing cryptographic SHA-256...";
+            const res = await fetch('/api/v1/ingest/live', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, alias, platform })
+            });
+            const result = await res.json();
+            outBox.innerText = JSON.stringify(result, null, 2);
+            loadActors();
+        }
+
         loadActors();
     </script>
 </body>
