@@ -14,7 +14,6 @@ import seed_demo_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure tables exist and 4 multi-market demo actors are seeded on startup
     init_database()
     try:
         seed_demo_data.seed_multiple_targets()
@@ -90,7 +89,7 @@ def get_graph_data():
             "label": f"TARGET: {row['primary_label']}",
             "color": "#ef4444",
             "shape": "diamond",
-            "size": 26
+            "size": 28
         })
 
     cur.execute("SELECT actor_id, alias_name, source_platform FROM actor_aliases;")
@@ -195,7 +194,7 @@ def investigation_dashboard():
         .btn { background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; display:inline-block; }
         .btn:hover { background:#0369a1; }
         pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; }
-        #network-graph { width: 100%; height: 580px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
+        #network-graph { width: 100%; height: 650px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
         textarea, input { width:100%; background:#030712; border:1px solid #334155; color:#fff; padding:10px; border-radius:6px; font-size:13px; margin-bottom:10px; }
     </style>
 </head>
@@ -330,10 +329,35 @@ def investigation_dashboard():
                 nodes: new vis.DataSet(data.nodes),
                 edges: new vis.DataSet(data.edges)
             };
+            
+            // WIDER PHYSICS SPACING: pushes clusters apart and lengthens connecting lines
             const options = {
-                physics: { stabilization: true, barnesHut: { springLength: 100 } },
-                nodes: { font: { color: "#ffffff", size: 12 } },
-                edges: { color: "#475569", font: { color: "#94a3b8", size: 10 } }
+                physics: {
+                    solver: 'barnesHut',
+                    barnesHut: {
+                        gravitationalConstant: -18000,
+                        centralGravity: 0.15,
+                        springLength: 220,
+                        springConstant: 0.04,
+                        damping: 0.09,
+                        avoidOverlap: 1
+                    },
+                    stabilization: { iterations: 150 }
+                },
+                nodes: {
+                    font: { color: "#f8fafc", size: 13, face: 'monospace' },
+                    borderWidth: 2
+                },
+                edges: {
+                    color: { color: "#475569", highlight: "#38bdf8" },
+                    font: { color: "#94a3b8", size: 11, align: 'middle' },
+                    smooth: { type: 'continuous' }
+                },
+                interaction: {
+                    hover: true,
+                    navigationButtons: true,
+                    keyboard: true
+                }
             };
             network = new vis.Network(container, graphData, options);
         }
