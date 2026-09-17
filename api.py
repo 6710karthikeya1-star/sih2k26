@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
         print(f"[STARTUP SEED LOG] {e}")
     yield
 
-app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.1.0", lifespan=lifespan)
+app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -193,7 +193,7 @@ def investigation_dashboard():
         .ip-badge { background:#b91c1c; color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:11px; }
         .btn { background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; display:inline-block; font-weight:600; }
         .btn:hover { background:#0369a1; }
-        .step-next-btn { background: linear-gradient(135deg, #0284c7, #2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 16px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; margin-top:16px; }
+        .step-next-btn { background: linear-gradient(135deg, #0284c7, #2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 18px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; margin-top:16px; }
         .step-next-btn:hover { background: linear-gradient(135deg, #0369a1, #1d4ed8); }
         pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; }
         #network-graph { width: 100%; height: 620px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
@@ -209,13 +209,14 @@ def investigation_dashboard():
         <span class="badge">NIST SP 800-86 FORENSIC READY</span>
     </header>
 
+    <!-- PROGRESSIVELY UNLOCKED TAB BAR -->
     <div class="tabs">
         <button id="tab-dossier-btn" class="tab-btn active" onclick="switchView('dossier')">1. Target Dossier View</button>
-        <button id="tab-graph-btn" class="tab-btn" onclick="switchView('graph')">2. Interactive Syndicate Network Graph</button>
-        <button id="tab-sandbox-btn" class="tab-btn" onclick="switchView('sandbox')">3. Live Evidence Ingestion Sandbox</button>
+        <button id="tab-graph-btn" class="tab-btn" style="display:none;" onclick="switchView('graph')">2. Interactive Syndicate Network Graph</button>
+        <button id="tab-sandbox-btn" class="tab-btn" style="display:none;" onclick="switchView('sandbox')">3. Live Evidence Ingestion Sandbox</button>
     </div>
     
-    <!-- STAGE 1: TARGET DOSSIER VIEW -->
+    <!-- STEP 1: TARGET DOSSIER VIEW -->
     <div id="view-dossier" class="grid">
         <div class="card">
             <h2>Resolved Targets</h2>
@@ -227,26 +228,26 @@ def investigation_dashboard():
         </div>
     </div>
 
-    <!-- STAGE 2: INTERACTIVE GRAPH VIEW -->
+    <!-- STEP 2: INTERACTIVE GRAPH VIEW -->
     <div id="view-graph" style="display:none;" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
             <div>
                 <h2>Bipartite Intelligence Graph (Multi-Hop De-Anonymization Clusters)</h2>
                 <span style="font-size:12px; color:#94a3b8;">🔴 Target Diamond &nbsp;|&nbsp; 🔵 Alias &nbsp;|&nbsp; 🟡 Crypto &nbsp;|&nbsp; 🟢 Contact &nbsp;|&nbsp; ⭐ Leaked Origin IP</span>
             </div>
-            <button class="step-next-btn" onclick="switchView('sandbox')">
-                Step 3: Test New Evidence in Live Sandbox ➔
+            <button class="step-next-btn" onclick="openStep3()">
+                Proceed to Step 3: Test New Evidence in Live Sandbox ➔
             </button>
         </div>
         <div id="network-graph"></div>
     </div>
 
-    <!-- STAGE 3: LIVE SANDBOX VIEW -->
+    <!-- STEP 3: LIVE SANDBOX VIEW -->
     <div id="view-sandbox" style="display:none;" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <h2>Live Dark Web Ingestion Terminal (Evaluate in Real-Time)</h2>
             <button class="btn" style="background:#334155;" onclick="switchView('dossier')">
-                ⬅ Back to Target Dossier View
+                ⬅ Return to Step 1: Target Dossier
             </button>
         </div>
         <p style="color:#94a3b8; font-size:13px; margin-bottom:14px;">Paste any unstructured darknet post below to watch our engine extract cryptographic pivots, compute SHA-256 integrity, and resolve aliases live:</p>
@@ -268,6 +269,17 @@ def investigation_dashboard():
     <script>
         let currentActors = [];
         let network = null;
+
+        // Progressive Step Transitions
+        function openStep2() {
+            document.getElementById('tab-graph-btn').style.display = 'inline-block';
+            switchView('graph');
+        }
+
+        function openStep3() {
+            document.getElementById('tab-sandbox-btn').style.display = 'inline-block';
+            switchView('sandbox');
+        }
 
         function switchView(tab) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -334,8 +346,8 @@ def investigation_dashboard():
                 <pre>${JSON.stringify(data.forensic_evidence, null, 2)}</pre>
 
                 <div style="text-align:right;">
-                    <button class="step-next-btn" onclick="switchView('graph')">
-                        Step 2: Analyze Syndicate in Interactive Network Graph ➔
+                    <button class="step-next-btn" onclick="openStep2()">
+                        Proceed to Step 2: Interactive Syndicate Graph ➔
                     </button>
                 </div>
             `;
@@ -355,9 +367,9 @@ def investigation_dashboard():
                 physics: {
                     solver: 'barnesHut',
                     barnesHut: {
-                        gravitationalConstant: -20000,
-                        centralGravity: 0.15,
-                        springLength: 220,
+                        gravitationalConstant: -22000,
+                        centralGravity: 0.12,
+                        springLength: 240,
                         springConstant: 0.04,
                         damping: 0.09,
                         avoidOverlap: 1
