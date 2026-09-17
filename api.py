@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
         print(f"[STARTUP SEED LOG] {e}")
     yield
 
-app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.2.0", lifespan=lifespan)
+app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -172,7 +172,7 @@ def investigation_dashboard():
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NTRO Darknet Threat Attribution & Entity Resolution Suite</title>
+    <title>NTRO Threat Attribution & Entity Resolution Suite</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -203,13 +203,12 @@ def investigation_dashboard():
 <body>
     <header>
         <div>
-            <h1>🛡️ NTRO Threat Attribution Engine <span style="font-size:12px; color:#64748b;">(SIH26151 National Evaluation Prototype)</span></h1>
+            <h1>🛡️ NTRO Threat Attribution Engine</h1>
             <p style="color:#64748b; font-size:13px;">Automated Darknet De-Anonymization, Multi-Pivot Entity Resolution & Infrastructure Fingerprinting</p>
         </div>
         <span class="badge">NIST SP 800-86 FORENSIC READY</span>
     </header>
 
-    <!-- PROGRESSIVELY UNLOCKED TAB BAR -->
     <div class="tabs">
         <button id="tab-dossier-btn" class="tab-btn active" onclick="switchView('dossier')">1. Target Dossier View</button>
         <button id="tab-graph-btn" class="tab-btn" style="display:none;" onclick="switchView('graph')">2. Interactive Syndicate Network Graph</button>
@@ -270,7 +269,6 @@ def investigation_dashboard():
         let currentActors = [];
         let network = null;
 
-        // Progressive Step Transitions
         function openStep2() {
             document.getElementById('tab-graph-btn').style.display = 'inline-block';
             switchView('graph');
