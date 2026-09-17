@@ -14,7 +14,7 @@ from resolution_pipeline import EntityResolutionPipeline
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_database()
-    if os.path.exists("seed_demo_data.py"):
+    import seed_demo_data; seed_demo_data.seed_multiple_targets(); if False:
         try:
             import seed_demo_data
         except Exception:
