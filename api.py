@@ -10,20 +10,16 @@ from db_manager import get_connection, init_database
 from report_generator import InvestigationReportGenerator
 from entity_extractor import ThreatEntityExtractor
 from resolution_pipeline import EntityResolutionPipeline
+import seed_demo_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure tables exist and 4 multi-market demo actors are seeded on startup
     init_database()
-    import seed_demo_data; seed_demo_data.seed_multiple_targets(); if False:
-        try:
-            import seed_demo_data
-        except Exception:
-            pass
-    elif os.path.exists("main.py"):
-        try:
-            import main
-        except Exception:
-            pass
+    try:
+        seed_demo_data.seed_multiple_targets()
+    except Exception as e:
+        print(f"[STARTUP SEED LOG] {e}")
     yield
 
 app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.0.0", lifespan=lifespan)
@@ -35,6 +31,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/api/v1/health")
+def health_check():
+    return {"status": "healthy", "engine": "running"}
 
 @app.get("/api/v1/actors")
 def list_actors():
@@ -214,7 +214,6 @@ def investigation_dashboard():
         <button class="tab-btn" onclick="switchView('sandbox')">Live Evidence Ingestion Sandbox</button>
     </div>
     
-    <!-- TAB 1: DOSSIER VIEW -->
     <div id="view-dossier" class="grid">
         <div class="card">
             <h2>Resolved Targets</h2>
@@ -226,7 +225,6 @@ def investigation_dashboard():
         </div>
     </div>
 
-    <!-- TAB 2: INTERACTIVE GRAPH VIEW -->
     <div id="view-graph" style="display:none;" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <h2>Bipartite Intelligence Graph (Multi-Hop De-Anonymization Clusters)</h2>
@@ -235,7 +233,6 @@ def investigation_dashboard():
         <div id="network-graph"></div>
     </div>
 
-    <!-- TAB 3: LIVE SANDBOX VIEW -->
     <div id="view-sandbox" style="display:none;" class="card">
         <h2>Live Dark Web Ingestion Terminal (Evaluate in Real-Time)</h2>
         <p style="color:#94a3b8; font-size:13px; margin-bottom:14px;">Paste any unstructured darknet post below to watch our engine extract cryptographic pivots, compute SHA-256 integrity, and resolve aliases live:</p>
