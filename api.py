@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
         print(f"[STARTUP SEED LOG] {e}")
     yield
 
-app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -181,7 +181,7 @@ def investigation_dashboard():
         h1 { font-size:22px; color:#38bdf8; display:flex; align-items:center; gap:8px; }
         .badge { background:#0284c7; padding:4px 10px; border-radius:4px; font-size:12px; font-weight:bold; }
         .tabs { display:flex; gap:10px; margin-bottom:18px; }
-        .tab-btn { background:#1e293b; color:#94a3b8; border:1px solid #334155; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600; font-size:13px; }
+        .tab-btn { background:#1e293b; color:#94a3b8; border:1px solid #334155; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600; font-size:13px; transition:0.2s; }
         .tab-btn.active { background:#0284c7; color:#fff; border-color:#38bdf8; }
         .grid { display:grid; grid-template-columns: 1fr 2fr; gap:20px; }
         .card { background:#111827; border-radius:8px; border:1px solid #1f2937; padding:18px; }
@@ -191,10 +191,12 @@ def investigation_dashboard():
         th { color:#94a3b8; font-weight:600; }
         .risk-pill { padding:3px 8px; border-radius:4px; font-weight:bold; font-size:11px; background:#ef4444; color:#fff; }
         .ip-badge { background:#b91c1c; color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:11px; }
-        .btn { background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; display:inline-block; }
+        .btn { background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; display:inline-block; font-weight:600; }
         .btn:hover { background:#0369a1; }
+        .step-next-btn { background: linear-gradient(135deg, #0284c7, #2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 16px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; margin-top:16px; }
+        .step-next-btn:hover { background: linear-gradient(135deg, #0369a1, #1d4ed8); }
         pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; }
-        #network-graph { width: 100%; height: 650px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
+        #network-graph { width: 100%; height: 620px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
         textarea, input { width:100%; background:#030712; border:1px solid #334155; color:#fff; padding:10px; border-radius:6px; font-size:13px; margin-bottom:10px; }
     </style>
 </head>
@@ -208,11 +210,12 @@ def investigation_dashboard():
     </header>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchView('dossier')">Target Dossier View</button>
-        <button class="tab-btn" onclick="switchView('graph')">Interactive Syndicate Network Graph</button>
-        <button class="tab-btn" onclick="switchView('sandbox')">Live Evidence Ingestion Sandbox</button>
+        <button id="tab-dossier-btn" class="tab-btn active" onclick="switchView('dossier')">1. Target Dossier View</button>
+        <button id="tab-graph-btn" class="tab-btn" onclick="switchView('graph')">2. Interactive Syndicate Network Graph</button>
+        <button id="tab-sandbox-btn" class="tab-btn" onclick="switchView('sandbox')">3. Live Evidence Ingestion Sandbox</button>
     </div>
     
+    <!-- STAGE 1: TARGET DOSSIER VIEW -->
     <div id="view-dossier" class="grid">
         <div class="card">
             <h2>Resolved Targets</h2>
@@ -224,16 +227,28 @@ def investigation_dashboard():
         </div>
     </div>
 
+    <!-- STAGE 2: INTERACTIVE GRAPH VIEW -->
     <div id="view-graph" style="display:none;" class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h2>Bipartite Intelligence Graph (Multi-Hop De-Anonymization Clusters)</h2>
-            <span style="font-size:12px; color:#94a3b8;">🔴 Target Diamond &nbsp;|&nbsp; 🔵 Alias &nbsp;|&nbsp; 🟡 Crypto &nbsp;|&nbsp; 🟢 Contact &nbsp;|&nbsp; ⭐ Leaked Origin IP</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h2>Bipartite Intelligence Graph (Multi-Hop De-Anonymization Clusters)</h2>
+                <span style="font-size:12px; color:#94a3b8;">🔴 Target Diamond &nbsp;|&nbsp; 🔵 Alias &nbsp;|&nbsp; 🟡 Crypto &nbsp;|&nbsp; 🟢 Contact &nbsp;|&nbsp; ⭐ Leaked Origin IP</span>
+            </div>
+            <button class="step-next-btn" onclick="switchView('sandbox')">
+                Step 3: Test New Evidence in Live Sandbox ➔
+            </button>
         </div>
         <div id="network-graph"></div>
     </div>
 
+    <!-- STAGE 3: LIVE SANDBOX VIEW -->
     <div id="view-sandbox" style="display:none;" class="card">
-        <h2>Live Dark Web Ingestion Terminal (Evaluate in Real-Time)</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h2>Live Dark Web Ingestion Terminal (Evaluate in Real-Time)</h2>
+            <button class="btn" style="background:#334155;" onclick="switchView('dossier')">
+                ⬅ Back to Target Dossier View
+            </button>
+        </div>
         <p style="color:#94a3b8; font-size:13px; margin-bottom:14px;">Paste any unstructured darknet post below to watch our engine extract cryptographic pivots, compute SHA-256 integrity, and resolve aliases live:</p>
         
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
@@ -260,12 +275,12 @@ def investigation_dashboard():
             document.getElementById('view-graph').style.display = (tab === 'graph') ? 'block' : 'none';
             document.getElementById('view-sandbox').style.display = (tab === 'sandbox') ? 'block' : 'none';
 
-            if(tab === 'dossier') event.target.classList.add('active');
+            if(tab === 'dossier') document.getElementById('tab-dossier-btn').classList.add('active');
             if(tab === 'graph') {
-                event.target.classList.add('active');
+                document.getElementById('tab-graph-btn').classList.add('active');
                 renderGraph();
             }
-            if(tab === 'sandbox') event.target.classList.add('active');
+            if(tab === 'sandbox') document.getElementById('tab-sandbox-btn').classList.add('active');
         }
 
         async function loadActors() {
@@ -317,6 +332,12 @@ def investigation_dashboard():
 
                 <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Digital Evidence Chain of Custody (SHA-256):</h4>
                 <pre>${JSON.stringify(data.forensic_evidence, null, 2)}</pre>
+
+                <div style="text-align:right;">
+                    <button class="step-next-btn" onclick="switchView('graph')">
+                        Step 2: Analyze Syndicate in Interactive Network Graph ➔
+                    </button>
+                </div>
             `;
             document.getElementById('target-detail').innerHTML = html;
         }
@@ -330,12 +351,11 @@ def investigation_dashboard():
                 edges: new vis.DataSet(data.edges)
             };
             
-            // WIDER PHYSICS SPACING: pushes clusters apart and lengthens connecting lines
             const options = {
                 physics: {
                     solver: 'barnesHut',
                     barnesHut: {
-                        gravitationalConstant: -18000,
+                        gravitationalConstant: -20000,
                         centralGravity: 0.15,
                         springLength: 220,
                         springConstant: 0.04,
