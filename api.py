@@ -4,24 +4,33 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 import uuid
-import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from db_manager import get_connection, init_database
 from report_generator import InvestigationReportGenerator
 from entity_extractor import ThreatEntityExtractor
 from resolution_pipeline import EntityResolutionPipeline
 import seed_demo_data
 
+def ensure_seeded():
+    try:
+        init_database()
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM threat_actors;")
+        count = cur.fetchone()[0]
+        conn.close()
+        if count == 0:
+            print("[AUTO-HEAL] No threat actors found. Seeding 4 default targets...")
+            seed_demo_data.seed_multiple_targets()
+    except Exception as e:
+        print(f"[AUTO-HEAL LOG] {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_database()
-    try:
-        seed_demo_data.seed_multiple_targets()
-    except Exception as e:
-        print(f"[STARTUP SEED LOG] {e}")
+    ensure_seeded()
     yield
 
-app = FastAPI(title="NTRO Threat Attribution Engine", version="3.4.0", lifespan=lifespan)
+app = FastAPI(title="NTRO Threat Attribution Engine", version="3.6.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,10 +42,11 @@ app.add_middleware(
 
 @app.get("/api/v1/health")
 def health_check():
-    return {"status": "healthy", "engine": "running"}
+    return {"status": "healthy"}
 
 @app.get("/api/v1/actors")
 def list_actors():
+    ensure_seeded()
     conn = get_connection()
     cur = conn.cursor()
     cur.execute('''
@@ -63,7 +73,7 @@ def get_actor_detail(actor_id: str):
     rep = InvestigationReportGenerator()
     try:
         return rep.fetch_full_actor_record(actor_id)
-    except ValueError:
+    except Exception:
         raise HTTPException(status_code=404, detail="Actor not found")
 
 @app.get("/api/v1/reports/{actor_id}/pdf")
@@ -72,11 +82,12 @@ def download_pdf_report(actor_id: str):
     try:
         pdf_path = rep.export_pdf(actor_id)
         return FileResponse(pdf_path, media_type="application/pdf", filename=os.path.basename(pdf_path))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Actor not found")
+    except Exception:
+        raise HTTPException(status_code=404, detail="Report generation failed")
 
 @app.get("/api/v1/graph/data")
 def get_graph_data():
+    ensure_seeded()
     conn = get_connection()
     cur = conn.cursor()
     nodes = []
@@ -199,7 +210,7 @@ def investigation_dashboard():
         .btn:hover { background:#0369a1; }
         .step-next-btn { background: linear-gradient(135deg, #0284c7, #2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 18px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; margin-top:16px; }
         .step-next-btn:hover { background: linear-gradient(135deg, #0369a1, #1d4ed8); }
-        pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; min-height: 200px; white-space: pre-wrap; }
+        pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; min-height: 180px; white-space: pre-wrap; }
         #network-graph { width: 100%; height: 620px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
         textarea, input { width:100%; background:#030712; border:1px solid #334155; color:#fff; padding:10px; border-radius:6px; font-size:13px; margin-bottom:10px; }
     </style>
@@ -298,6 +309,11 @@ def investigation_dashboard():
             try {
                 const res = await fetch('/api/v1/actors');
                 currentActors = await res.json();
+                if (!Array.isArray(currentActors) || currentActors.length === 0) {
+                    document.getElementById('target-list').innerHTML = '<p style="color:#38bdf8; padding:8px;">Syncing targets from ledger...</p>';
+                    setTimeout(loadActors, 1500);
+                    return;
+                }
                 let html = '<table><thead><tr><th>Primary Label</th><th>Risk</th><th>Aliases</th><th>IP Leaks</th><th>Action</th></tr></thead><tbody>';
                 currentActors.forEach(a => {
                     html += `<tr>
@@ -310,51 +326,58 @@ def investigation_dashboard():
                 });
                 html += '</tbody></table>';
                 document.getElementById('target-list').innerHTML = html;
-                if(currentActors.length > 0) viewDetail(currentActors[0].actor_id);
+                if(currentActors.length > 0 && currentActors[0].actor_id !== 'error') {
+                    viewDetail(currentActors[0].actor_id);
+                }
             } catch(err) {
-                console.error("Failed to load actors:", err);
+                document.getElementById('target-list').innerHTML = `<p style="color:#f87171; padding:8px;">Reconnecting to backend: ${err.message}</p>`;
+                setTimeout(loadActors, 2000);
             }
         }
 
         async function viewDetail(actorId) {
-            const res = await fetch(`/api/v1/actors/${actorId}`);
-            const data = await res.json();
-            let p = data.actor_profile;
-            let ipHtml = (data.leaked_ips && data.leaked_ips.length > 0)
-                ? `<div style="background:#450a0a; border:1px solid #ef4444; border-radius:6px; padding:10px; margin:12px 0;">
+            try {
+                const res = await fetch(`/api/v1/actors/${actorId}`);
+                const data = await res.json();
+                let p = data.actor_profile;
+                let ipHtml = (data.leaked_ips && data.leaked_ips.length > 0)
+                    ? `<div style="background:#450a0a; border:1px solid #ef4444; border-radius:6px; padding:10px; margin:12px 0;">
                      <h4 style="color:#f87171; font-size:13px;">CRITICAL: Clearnet IP Leaks Discovered</h4>
                      <ul>${data.leaked_ips.map(ip => `<li style="margin-left:20px; font-size:12px; color:#fca5a5;"><b>${ip.ip_address}</b> (Source:${ip.leak_source})</li>`).join('')}</ul>
                    </div>`
                 : '';
 
-            let html = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                    <div>
-                        <h3 style="color:#f8fafc; font-size:18px;">${p.primary_label}</h3>
-                        <span style="font-size:11px; color:#64748b;">Master Target UUID: ${p.actor_id}</span>
+                let html = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <div>
+                            <h3 style="color:#f8fafc; font-size:18px;">${p.primary_label}</h3>
+                            <span style="font-size:11px; color:#64748b;">Master Target UUID: ${p.actor_id}</span>
+                        </div>
+                        <a href="/api/v1/reports/${p.actor_id}/pdf" target="_blank" class="btn" style="background:#10b981;">Download Case PDF</a>
                     </div>
-                    <a href="/api/v1/reports/${p.actor_id}/pdf" target="_blank" class="btn" style="background:#10b981;">Download Case PDF</a>
-                </div>
-                ${ipHtml}
-                <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Unified Cross-Market Aliases:</h4>
-                <ul>${data.aliases.map(a => `<li style="margin-left:20px; font-size:12px;"><b>${a.alias_name}</b> (Platform:${a.source_platform})</li>`).join('')}</ul>
-                
-                <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Discovered Crypto Wallets:</h4>
-                <ul>${data.crypto_wallets.map(w => `<li style="margin-left:20px; font-size:12px;"><b>[${w.currency}]</b>${w.address}</li>`).join('')}</ul>
+                    ${ipHtml}
+                    <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Unified Cross-Market Aliases:</h4>
+                    <ul>${data.aliases.map(a => `<li style="margin-left:20px; font-size:12px;"><b>${a.alias_name}</b> (Platform:${a.source_platform})</li>`).join('')}</ul>
+                    
+                    <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Discovered Crypto Wallets:</h4>
+                    <ul>${data.crypto_wallets.map(w => `<li style="margin-left:20px; font-size:12px;"><b>[${w.currency}]</b>${w.address}</li>`).join('')}</ul>
 
-                <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Contact Identifiers:</h4>
-                <ul>${data.contact_handles.map(h => `<li style="margin-left:20px; font-size:12px;"><b>[${h.handle_type.toUpperCase()}]</b>${h.handle_value}</li>`).join('')}</ul>
+                    <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Contact Identifiers:</h4>
+                    <ul>${data.contact_handles.map(h => `<li style="margin-left:20px; font-size:12px;"><b>[${h.handle_type.toUpperCase()}]</b>${h.handle_value}</li>`).join('')}</ul>
 
-                <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Digital Evidence Chain of Custody (SHA-256):</h4>
-                <pre>${JSON.stringify(data.forensic_evidence, null, 2)}</pre>
+                    <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Digital Evidence Chain of Custody (SHA-256):</h4>
+                    <pre>${JSON.stringify(data.forensic_evidence, null, 2)}</pre>
 
-                <div style="text-align:right;">
-                    <button class="step-next-btn" onclick="openStep2()">
-                        Proceed to Step 2: Interactive Syndicate Graph ➔
-                    </button>
-                </div>
-            `;
-            document.getElementById('target-detail').innerHTML = html;
+                    <div style="text-align:right;">
+                        <button class="step-next-btn" onclick="openStep2()">
+                            Proceed to Step 2: Interactive Syndicate Graph ➔
+                        </button>
+                    </div>
+                `;
+                document.getElementById('target-detail').innerHTML = html;
+            } catch(err) {
+                console.error("View detail error:", err);
+            }
         }
 
         async function renderGraph() {
