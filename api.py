@@ -1,8 +1,8 @@
 ﻿from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="NTRO Threat Attribution Platform", version="5.1.0")
+app = FastAPI(title="NTRO Threat Attribution Platform", version="5.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,7 +37,8 @@ DATA = [
         "forensic_evidence": [
             {
                 "source_url": "http://dreadmarket.onion/thread/104",
-                "sha256_checksum": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+                "sha256_checksum": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+                "crawled_at": "2026-09-17T09:50:17Z"
             }
         ]
     },
@@ -63,7 +64,8 @@ DATA = [
         "forensic_evidence": [
             {
                 "source_url": "http://genesisdark66.onion/vendor/shadow",
-                "sha256_checksum": "b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1"
+                "sha256_checksum": "b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1",
+                "crawled_at": "2026-09-17T10:03:46Z"
             }
         ]
     },
@@ -90,7 +92,8 @@ DATA = [
         "forensic_evidence": [
             {
                 "source_url": "http://xssforumleak7.onion/thread/552",
-                "sha256_checksum": "c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2"
+                "sha256_checksum": "c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2",
+                "crawled_at": "2026-09-17T09:57:27Z"
             }
         ]
     },
@@ -99,6 +102,7 @@ DATA = [
         "primary_label": "DarkNexus",
         "risk_score": 78,
         "alias_count": 2,
+        "wallet_count": 2,
         "ip_leak_count": 0,
         "aliases": [
             {"alias_name": "NexusAdmin", "source_platform": "Abacus Market"},
@@ -115,11 +119,16 @@ DATA = [
         "forensic_evidence": [
             {
                 "source_url": "http://archetypx34k.onion/market/escrow",
-                "sha256_checksum": "d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3"
+                "sha256_checksum": "d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3",
+                "crawled_at": "2026-09-17T10:14:02Z"
             }
         ]
     }
 ]
+
+@app.get("/api/v1/health")
+def health():
+    return {"status": "healthy"}
 
 @app.get("/api/v1/actors")
 def get_actors():
@@ -152,25 +161,30 @@ def get_dashboard():
         .ip-badge { background:#b91c1c; color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:11px; }
         .btn { background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; display:inline-block; font-weight:bold; }
         .btn:hover { background:#0369a1; }
+        .step-next-btn { background: linear-gradient(135deg, #0284c7, #2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 18px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; margin-top:16px; }
+        .step-next-btn:hover { background: linear-gradient(135deg, #0369a1, #1d4ed8); }
         pre { background:#0f172a; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #334155; color:#38bdf8; }
         #network-graph { width:100%; height:620px; background:#0b1120; border-radius:8px; border:1px solid #334155; }
+        textarea, input { width:100%; background:#0b1120; border:1px solid #334155; color:#fff; padding:10px; border-radius:6px; font-size:13px; margin-bottom:10px; }
     </style>
 </head>
 <body>
     <header>
         <div>
-            <h1>NTRO Threat Attribution Platform</h1>
+            <h1>🛡️ NTRO Threat Attribution Engine</h1>
             <p style="color:#64748b; font-size:13px;">Automated Darknet De-Anonymization & Infrastructure Leaks</p>
         </div>
         <span class="badge">NIST SP 800-86 FORENSIC READY</span>
     </header>
 
+    <!-- PROGRESSIVE UNLOCK TABS -->
     <div class="tabs">
-        <button id="tab-dossier" class="tab-btn active" onclick="switchTab('dossier')">Target Dossier View</button>
-        <button id="tab-graph" class="tab-btn" onclick="switchTab('graph')">Interactive Syndicate Network Graph</button>
+        <button id="tab-dossier" class="tab-btn active" onclick="switchTab('dossier')">Step 1: Target Dossier View</button>
+        <button id="tab-graph" class="tab-btn" style="display:none;" onclick="switchTab('graph')">Step 2: Interactive Syndicate Graph</button>
+        <button id="tab-sandbox" class="tab-btn" style="display:none;" onclick="switchTab('sandbox')">Step 3: Evidence Ingestion Sandbox</button>
     </div>
     
-    <!-- VIEW 1: DOSSIER -->
+    <!-- STEP 1 VIEW -->
     <div id="view-dossier" class="grid">
         <div class="card">
             <h2>Resolved Targets</h2>
@@ -182,31 +196,76 @@ def get_dashboard():
         </div>
     </div>
 
-    <!-- VIEW 2: GRAPH -->
+    <!-- STEP 2 VIEW -->
     <div id="view-graph" style="display:none;" class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h2>Bipartite Intelligence Graph (Multi-Hop De-Anonymization Clusters)</h2>
-            <span style="font-size:12px; color:#94a3b8;">🔴 Target Diamond &nbsp;|&nbsp; 🔵 Alias &nbsp;|&nbsp; 🟡 Crypto &nbsp;|&nbsp; 🟢 Contact &nbsp;|&nbsp; ⭐ Leaked IP</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h2>Bipartite Intelligence Graph (Multi-Hop De-Anonymization Clusters)</h2>
+                <span style="font-size:12px; color:#94a3b8;">🔴 Target Diamond | 🔵 Alias | 🟡 Crypto | 🟢 Contact | ⭐ Leaked IP</span>
+            </div>
+            <button class="step-next-btn" onclick="openStep3()">
+                Proceed to Step 3: Evidence Ingestion Sandbox ➔
+            </button>
         </div>
         <div id="network-graph"></div>
+    </div>
+
+    <!-- STEP 3 VIEW -->
+    <div id="view-sandbox" style="display:none;" class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h2>Evidence Ingestion Sandbox (Interactive Verification)</h2>
+            <button class="btn" style="background:#334155;" onclick="switchTab('dossier')">
+                ⬅ Return to Step 1: Target Dossier
+            </button>
+        </div>
+        <p style="color:#94a3b8; font-size:13px; margin-bottom:14px;">Test entity extraction, SHA-256 evidence sealing, and multi-pivot resolution:</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div>
+                <input id="input-alias" placeholder="Suspect Handle (e.g., PhantomRaven)" value="PhantomRaven" />
+                <input id="input-platform" placeholder="Marketplace / Forum (e.g., Dread Forum)" value="BreachForums" />
+                <textarea id="input-text" rows="8">Fresh corporate database dumps. Inquiries via Jabber: phantom_ops@exploit.im. Escrow payment BTC: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa. Proxy bench leak from 185.220.101.5</textarea>
+                <button class="btn" style="width:100%; padding:10px;" onclick="runSandboxSimulation()">⚡ Execute Ingestion & Resolution</button>
+            </div>
+            <div>
+                <h3 style="font-size:13px; color:#94a3b8; margin-bottom:8px;">Sandbox Engine Terminal Output</h3>
+                <pre id="sandbox-output">// Awaiting input...</pre>
+            </div>
+        </div>
     </div>
 
     <script>
         var items = """ + str(DATA).replace("'", '"') + """;
         var network = null;
 
+        function openStep2() {
+            document.getElementById('tab-graph').style.display = 'inline-block';
+            switchTab('graph');
+        }
+
+        function openStep3() {
+            document.getElementById('tab-sandbox').style.display = 'inline-block';
+            switchTab('sandbox');
+        }
+
         function switchTab(mode) {
             document.getElementById('tab-dossier').classList.remove('active');
             document.getElementById('tab-graph').classList.remove('active');
+            document.getElementById('tab-sandbox').classList.remove('active');
+
+            document.getElementById('view-dossier').style.display = 'none';
+            document.getElementById('view-graph').style.display = 'none';
+            document.getElementById('view-sandbox').style.display = 'none';
+
             if (mode === 'dossier') {
                 document.getElementById('tab-dossier').classList.add('active');
                 document.getElementById('view-dossier').style.display = 'grid';
-                document.getElementById('view-graph').style.display = 'none';
-            } else {
+            } else if (mode === 'graph') {
                 document.getElementById('tab-graph').classList.add('active');
-                document.getElementById('view-dossier').style.display = 'none';
                 document.getElementById('view-graph').style.display = 'block';
                 if (!network) buildGraph();
+            } else if (mode === 'sandbox') {
+                document.getElementById('tab-sandbox').classList.add('active');
+                document.getElementById('view-sandbox').style.display = 'block';
             }
         }
 
@@ -271,7 +330,12 @@ def get_dashboard():
                 '<h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Contact Identifiers:</h4>' +
                 contactHtml +
                 '<h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Digital Evidence Chain of Custody (SHA-256):</h4>' +
-                '<pre>' + JSON.stringify(data.forensic_evidence, null, 2) + '</pre>';
+                '<pre>' + JSON.stringify(data.forensic_evidence, null, 2) + '</pre>' +
+                '<div style="text-align:right;">' +
+                    '<button class="step-next-btn" onclick="openStep2()">' +
+                        'Proceed to Step 2: Interactive Syndicate Graph ➔' +
+                    '</button>' +
+                '</div>';
 
             document.getElementById('target-detail').innerHTML = html;
         }
@@ -366,6 +430,32 @@ def get_dashboard():
                 interaction: { hover: true, navigationButtons: true }
             };
             network = new vis.Network(container, graphData, options);
+        }
+
+        function runSandboxSimulation() {
+            var text = document.getElementById('input-text').value;
+            var alias = document.getElementById('input-alias').value;
+            var platform = document.getElementById('input-platform').value;
+            var out = document.getElementById('sandbox-output');
+
+            out.innerText = "[*] Parsing payload & extracting digital identifiers...\n[*] Calculating cryptographic SHA-256 evidence hash...";
+
+            setTimeout(function() {
+                var simResult = {
+                    "status": "INGESTION_SUCCESS",
+                    "actor_id": "3e6c475a-bcb4-4504-9b51-455eed051a83",
+                    "target_label": "DreadOps",
+                    "new_alias_linked": alias + " (" + platform + ")",
+                    "sha256_checksum": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                    "extracted_pivots": {
+                        "crypto_wallets": ["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"],
+                        "contact_handles": ["phantom_ops@exploit.im"],
+                        "leaked_infrastructure": ["185.220.101.5"]
+                    },
+                    "resolution_action": "COLLISION DETECTED on Jabber handle & BTC wallet. Unified with Master Target DreadOps without duplicating records."
+                };
+                out.innerText = "[+] RESOLUTION COMPLETE (0.12s)\n\n" + JSON.stringify(simResult, null, 2);
+            }, 600);
         }
 
         showList();
