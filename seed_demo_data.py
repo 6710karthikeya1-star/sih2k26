@@ -1,5 +1,5 @@
 ﻿import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from db_manager import get_connection, init_database
 
 def seed_multiple_targets():
@@ -7,7 +7,6 @@ def seed_multiple_targets():
     conn = get_connection()
     cur = conn.cursor()
 
-    # Clear old data so there are no duplicate conflicts
     cur.execute("DELETE FROM ip_addresses;")
     cur.execute("DELETE FROM contact_handles;")
     cur.execute("DELETE FROM crypto_wallets;")
@@ -35,7 +34,7 @@ def seed_multiple_targets():
             "leaks": [
                 ("185.220.101.5", "http://hiddenleak45j3.onion/post/99")
             ],
-            "evidence": ("http://dreadmarket.onion/thread/104", "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90", "<html>DreadOps marketplace vendor escrow feed</html>")
+            "evidence": ("http://dreadmarket.onion/thread/104", "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90", "<html>DreadOps vendor escrow dump</html>")
         },
         {
             "id": str(uuid.uuid4()),
@@ -96,7 +95,7 @@ def seed_multiple_targets():
         }
     ]
 
-    now_utc = datetime.utcnow().isoformat() + "Z"
+    now_utc = datetime.now(timezone.utc).isoformat()
 
     for t in targets:
         cur.execute(
@@ -126,13 +125,13 @@ def seed_multiple_targets():
             )
         for ip, src in t["leaks"]:
             cur.execute(
-                "INSERT INTO ip_addresses (actor_id, ip_address, leak_source) VALUES (?, ?, ?);",
-                (t["id"], ip, src)
+                "INSERT INTO ip_addresses (ip_id, actor_id, ip_address, leak_source) VALUES (?, ?, ?, ?);",
+                (str(uuid.uuid4()), t["id"], ip, src)
             )
 
     conn.commit()
     conn.close()
-    print("[+] Successfully seeded 4 distinct threat actor syndicates into database.")
+    print("[+] Successfully seeded all 4 targets.")
 
 if __name__ == "__main__":
     seed_multiple_targets()
