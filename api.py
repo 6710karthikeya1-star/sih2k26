@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
         print(f"[STARTUP SEED LOG] {e}")
     yield
 
-app = FastAPI(title="NTRO Dark Web Intel System - Advanced Edition", version="3.3.0", lifespan=lifespan)
+app = FastAPI(title="NTRO Threat Attribution Engine", version="3.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -153,18 +153,22 @@ def live_ingest(payload: dict = Body(...)):
     if not raw_text.strip():
         raise HTTPException(status_code=400, detail="Evidence text cannot be empty")
 
-    extractor = ThreatEntityExtractor()
-    resolver = EntityResolutionPipeline()
+    try:
+        extractor = ThreatEntityExtractor()
+        resolver = EntityResolutionPipeline()
 
-    extracted = extractor.extract_entities(raw_text, source_url)
-    actor_id = resolver.resolve_and_store(extracted, alias, platform)
+        extracted = extractor.extract_entities(raw_text, source_url)
+        extracted["evidence_metadata"]["raw_html"] = raw_text
+        actor_id = resolver.resolve_and_store(extracted, alias, platform)
 
-    return {
-        "status": "INGESTION_COMPLETE",
-        "actor_id": actor_id,
-        "sha256_checksum": extracted["evidence_metadata"]["sha256_checksum"],
-        "extracted_entities": extracted
-    }
+        return {
+            "status": "INGESTION_SUCCESS",
+            "actor_id": actor_id,
+            "sha256_checksum": extracted["evidence_metadata"]["sha256_checksum"],
+            "extracted_entities": extracted
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def investigation_dashboard():
@@ -195,7 +199,7 @@ def investigation_dashboard():
         .btn:hover { background:#0369a1; }
         .step-next-btn { background: linear-gradient(135deg, #0284c7, #2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 18px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; margin-top:16px; }
         .step-next-btn:hover { background: linear-gradient(135deg, #0369a1, #1d4ed8); }
-        pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; }
+        pre { background:#030712; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; border:1px solid #1f2937; color:#38bdf8; min-height: 200px; white-space: pre-wrap; }
         #network-graph { width: 100%; height: 620px; background:#030712; border-radius:8px; border:1px solid #1f2937; }
         textarea, input { width:100%; background:#030712; border:1px solid #334155; color:#fff; padding:10px; border-radius:6px; font-size:13px; margin-bottom:10px; }
     </style>
@@ -215,7 +219,6 @@ def investigation_dashboard():
         <button id="tab-sandbox-btn" class="tab-btn" style="display:none;" onclick="switchView('sandbox')">3. Live Evidence Ingestion Sandbox</button>
     </div>
     
-    <!-- STEP 1: TARGET DOSSIER VIEW -->
     <div id="view-dossier" class="grid">
         <div class="card">
             <h2>Resolved Targets</h2>
@@ -227,7 +230,6 @@ def investigation_dashboard():
         </div>
     </div>
 
-    <!-- STEP 2: INTERACTIVE GRAPH VIEW -->
     <div id="view-graph" style="display:none;" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
             <div>
@@ -241,7 +243,6 @@ def investigation_dashboard():
         <div id="network-graph"></div>
     </div>
 
-    <!-- STEP 3: LIVE SANDBOX VIEW -->
     <div id="view-sandbox" style="display:none;" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <h2>Live Dark Web Ingestion Terminal (Evaluate in Real-Time)</h2>
@@ -294,21 +295,25 @@ def investigation_dashboard():
         }
 
         async function loadActors() {
-            const res = await fetch('/api/v1/actors');
-            currentActors = await res.json();
-            let html = '<table><thead><tr><th>Primary Label</th><th>Risk</th><th>Aliases</th><th>IP Leaks</th><th>Action</th></tr></thead><tbody>';
-            currentActors.forEach(a => {
-                html += `<tr>
-                    <td><b>${a.primary_label}</b></td>
-                    <td><span class="risk-pill">${a.risk_score}/100</span></td>
-                    <td>${a.alias_count}</td>
-                    <td><span class="ip-badge">${a.ip_leak_count}</span></td>
-                    <td><button class="btn" onclick="viewDetail('${a.actor_id}')">Inspect</button></td>
-                </tr>`;
-            });
-            html += '</tbody></table>';
-            document.getElementById('target-list').innerHTML = html;
-            if(currentActors.length > 0) viewDetail(currentActors[0].actor_id);
+            try {
+                const res = await fetch('/api/v1/actors');
+                currentActors = await res.json();
+                let html = '<table><thead><tr><th>Primary Label</th><th>Risk</th><th>Aliases</th><th>IP Leaks</th><th>Action</th></tr></thead><tbody>';
+                currentActors.forEach(a => {
+                    html += `<tr>
+                        <td><b>${a.primary_label}</b></td>
+                        <td><span class="risk-pill">${a.risk_score}/100</span></td>
+                        <td>${a.alias_count}</td>
+                        <td><span class="ip-badge">${a.ip_leak_count}</span></td>
+                        <td><button class="btn" onclick="viewDetail('${a.actor_id}')">Inspect</button></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                document.getElementById('target-list').innerHTML = html;
+                if(currentActors.length > 0) viewDetail(currentActors[0].actor_id);
+            } catch(err) {
+                console.error("Failed to load actors:", err);
+            }
         }
 
         async function viewDetail(actorId) {
@@ -318,7 +323,7 @@ def investigation_dashboard():
             let ipHtml = (data.leaked_ips && data.leaked_ips.length > 0)
                 ? `<div style="background:#450a0a; border:1px solid #ef4444; border-radius:6px; padding:10px; margin:12px 0;">
                      <h4 style="color:#f87171; font-size:13px;">CRITICAL: Clearnet IP Leaks Discovered</h4>
-                     <ul>${data.leaked_ips.map(ip => `<li style="margin-left:20px; font-size:12px; color:#fca5a5;"><b>${ip.ip_address}</b> (Source: ${ip.leak_source})</li>`).join('')}</ul>
+                     <ul>${data.leaked_ips.map(ip => `<li style="margin-left:20px; font-size:12px; color:#fca5a5;"><b>${ip.ip_address}</b> (Source:${ip.leak_source})</li>`).join('')}</ul>
                    </div>`
                 : '';
 
@@ -332,13 +337,13 @@ def investigation_dashboard():
                 </div>
                 ${ipHtml}
                 <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Unified Cross-Market Aliases:</h4>
-                <ul>${data.aliases.map(a => `<li style="margin-left:20px; font-size:12px;"><b>${a.alias_name}</b> (Platform: ${a.source_platform})</li>`).join('')}</ul>
+                <ul>${data.aliases.map(a => `<li style="margin-left:20px; font-size:12px;"><b>${a.alias_name}</b> (Platform:${a.source_platform})</li>`).join('')}</ul>
                 
                 <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Discovered Crypto Wallets:</h4>
-                <ul>${data.crypto_wallets.map(w => `<li style="margin-left:20px; font-size:12px;"><b>[${w.currency}]</b> ${w.address}</li>`).join('')}</ul>
+                <ul>${data.crypto_wallets.map(w => `<li style="margin-left:20px; font-size:12px;"><b>[${w.currency}]</b>${w.address}</li>`).join('')}</ul>
 
                 <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Contact Identifiers:</h4>
-                <ul>${data.contact_handles.map(h => `<li style="margin-left:20px; font-size:12px;"><b>[${h.handle_type.toUpperCase()}]</b> ${h.handle_value}</li>`).join('')}</ul>
+                <ul>${data.contact_handles.map(h => `<li style="margin-left:20px; font-size:12px;"><b>[${h.handle_type.toUpperCase()}]</b>${h.handle_value}</li>`).join('')}</ul>
 
                 <h4 style="color:#38bdf8; font-size:13px; margin-top:12px;">Digital Evidence Chain of Custody (SHA-256):</h4>
                 <pre>${JSON.stringify(data.forensic_evidence, null, 2)}</pre>
@@ -398,15 +403,28 @@ def investigation_dashboard():
             const platform = document.getElementById('input-platform').value;
             const outBox = document.getElementById('sandbox-output');
 
-            outBox.innerText = "[*] Extracting digital pivots & computing cryptographic SHA-256...";
-            const res = await fetch('/api/v1/ingest/live', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text, alias, platform })
-            });
-            const result = await res.json();
-            outBox.innerText = JSON.stringify(result, null, 2);
-            loadActors();
+            if (!text.trim()) {
+                outBox.innerText = "[!] Please enter evidence text in the textarea.";
+                return;
+            }
+
+            outBox.innerText = "[*] Sending payload to backend ingestion engine...\n[*] Computing SHA-256 & cross-referencing pivots...";
+            try {
+                const res = await fetch('/api/v1/ingest/live', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, alias, platform })
+                });
+                const result = await res.json();
+                if (!res.ok) {
+                    outBox.innerText = `[ERROR ${res.status}] ` + JSON.stringify(result, null, 2);
+                } else {
+                    outBox.innerText = "[SUCCESS] Evidence Ingested & Resolved!\n\n" + JSON.stringify(result, null, 2);
+                    loadActors();
+                }
+            } catch (err) {
+                outBox.innerText = `[NETWORK/FETCH ERROR]: ${err.message}`;
+            }
         }
 
         loadActors();
